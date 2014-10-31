@@ -1,0 +1,101 @@
+From b6ad7922486c4a8be3594163cb9c27b08f3fa0bc Mon Sep 17 00:00:00 2001
+From: Nick Babenko <nickbabenko@me.com>
+Date: Thu, 30 Oct 2014 17:00:56 +0000
+Subject: [PATCH] Updated for iOS 8
+
+---
+ Code/LocationManager/BKLocationManager.h |  1 +
+ Code/LocationManager/BKLocationManager.m | 44 +++++++++++++++++++++++++++-----
+ 2 files changed, 39 insertions(+), 6 deletions(-)
+
+diff --git a/Code/LocationManager/BKLocationManager.h b/Code/LocationManager/BKLocationManager.h
+index c867a33..7ea83d4 100644
+--- a/Code/LocationManager/BKLocationManager.h
++++ b/Code/LocationManager/BKLocationManager.h
+@@ -26,6 +26,7 @@ typedef void (^BKLocationManagerDidFail)(CLLocationManager *manager, NSError *er
+ @interface BKLocationManager : NSObject <CLLocationManagerDelegate> {
+     BKLocationManagerDidUpdateLocation _didUpdateLocationBlock;
+     BKLocationManagerDidFail _didFailBlock;
++    BOOL prompted;
+ }
+ 
+ @property (nonatomic, strong) CLLocationManager *locationManager;
+diff --git a/Code/LocationManager/BKLocationManager.m b/Code/LocationManager/BKLocationManager.m
+index 3d3b2ac..61bd688 100644
+--- a/Code/LocationManager/BKLocationManager.m
++++ b/Code/LocationManager/BKLocationManager.m
+@@ -55,6 +55,7 @@
+     self = [super init];
+     
+     if (self) {
++        prompted = NO;
+         _locationManager = [[CLLocationManager alloc] init];
+         self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
+         self.locationManager.delegate = self;
+@@ -67,7 +68,16 @@
+ ////////////////////////////////////////////////////////////////////////////////////////////////////
+ - (void)startUpdatingLocationWithAccuracy:(CLLocationAccuracy)accurary {
+     self.locationManager.desiredAccuracy = accurary;
+-    [self.locationManager startUpdatingLocation];
++    
++    if([self.locationManager respondsToSelector:@selector(requestWhenInUseAuthorization)] &&
++       [CLLocationManager authorizationStatus] != kCLAuthorizationStatusAuthorizedWhenInUse) {
++        prompted = YES;
++        
++        [self.locationManager requestWhenInUseAuthorization];
++    }
++    else {
++        [self.locationManager startUpdatingLocation];
++    }
+ }
+ 
+ 
+@@ -130,12 +140,9 @@
+ 
+ 
+ ////////////////////////////////////////////////////////////////////////////////////////////////////
+-- (void)locationManager:(CLLocationManager *)manager
+-    didUpdateToLocation:(CLLocation *)newLocation
+-           fromLocation:(CLLocation *)oldLocation {
+-    
++- (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray *)locations {
+     if (nil != _didUpdateLocationBlock) {
+-        _didUpdateLocationBlock(manager, newLocation, oldLocation);
++        _didUpdateLocationBlock(manager, [locations lastObject], nil);
+     }
+ }
+ 
+@@ -151,5 +158,30 @@
+ 	[self.locationManager stopUpdatingLocation];
+ }
+ 
++- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
++{
++    if(status == kCLAuthorizationStatusAuthorizedWhenInUse) {
++        [self.locationManager startUpdatingLocation];
++    }
++    else {
++        if(prompted) {
++            [[[UIAlertView alloc] initWithTitle:@"Location Request"
++                                        message:@"To detect your location you must select 'Allow' when you're asked to use your current location."
++                                       delegate:nil
++                              cancelButtonTitle:@"OK"
++                              otherButtonTitles:nil] show];
++            
++            if(nil != _didFailBlock) {
++                _didFailBlock(manager, nil);
++            }
++        }
++        else {
++            prompted = YES;
++            
++            [self.locationManager requestWhenInUseAuthorization];
++        }
++    }
++}
++
+ 
+ @end
+-- 
+1.8.4.2
+

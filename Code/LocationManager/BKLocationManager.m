@@ -55,6 +55,7 @@
     self = [super init];
     
     if (self) {
+        prompted = NO;
         _locationManager = [[CLLocationManager alloc] init];
         self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
         self.locationManager.delegate = self;
@@ -67,7 +68,16 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)startUpdatingLocationWithAccuracy:(CLLocationAccuracy)accurary {
     self.locationManager.desiredAccuracy = accurary;
-    [self.locationManager startUpdatingLocation];
+    
+    if([self.locationManager respondsToSelector:@selector(requestWhenInUseAuthorization)] &&
+       [CLLocationManager authorizationStatus] != kCLAuthorizationStatusAuthorizedWhenInUse) {
+        prompted = YES;
+        
+        [self.locationManager requestWhenInUseAuthorization];
+    }
+    else {
+        [self.locationManager startUpdatingLocation];
+    }
 }
 
 
@@ -130,12 +140,9 @@
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)locationManager:(CLLocationManager *)manager
-    didUpdateToLocation:(CLLocation *)newLocation
-           fromLocation:(CLLocation *)oldLocation {
-    
+- (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray *)locations {
     if (nil != _didUpdateLocationBlock) {
-        _didUpdateLocationBlock(manager, newLocation, oldLocation);
+        _didUpdateLocationBlock(manager, [locations lastObject], nil);
     }
 }
 
@@ -149,6 +156,31 @@
     }
     
 	[self.locationManager stopUpdatingLocation];
+}
+
+- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
+{
+    if(status == kCLAuthorizationStatusAuthorizedWhenInUse) {
+        [self.locationManager startUpdatingLocation];
+    }
+    else {
+        if(prompted) {
+            [[[UIAlertView alloc] initWithTitle:@"Location Request"
+                                        message:@"To detect your location you must select 'Allow' when you're asked to use your current location."
+                                       delegate:nil
+                              cancelButtonTitle:@"OK"
+                              otherButtonTitles:nil] show];
+            
+            if(nil != _didFailBlock) {
+                _didFailBlock(manager, nil);
+            }
+        }
+        else {
+            prompted = YES;
+            
+            [self.locationManager requestWhenInUseAuthorization];
+        }
+    }
 }
 
 

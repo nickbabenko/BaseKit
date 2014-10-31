@@ -26,6 +26,7 @@ typedef void (^BKLocationManagerDidFail)(CLLocationManager *manager, NSError *er
 @interface BKLocationManager : NSObject <CLLocationManagerDelegate> {
     BKLocationManagerDidUpdateLocation _didUpdateLocationBlock;
     BKLocationManagerDidFail _didFailBlock;
+    BOOL prompted;
 }
 
 @property (nonatomic, strong) CLLocationManager *locationManager;
