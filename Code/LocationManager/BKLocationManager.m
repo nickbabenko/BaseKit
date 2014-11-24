@@ -160,10 +160,7 @@
 
 - (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
 {
-    if(status == kCLAuthorizationStatusAuthorizedWhenInUse) {
-        [self.locationManager startUpdatingLocation];
-    }
-    else {
+    if(status == kCLAuthorizationStatusNotDetermined) {
         if(prompted) {
             [[[UIAlertView alloc] initWithTitle:@"Location Request"
                                         message:@"To detect your location you must select 'Allow' when you're asked to use your current location."
@@ -178,8 +175,25 @@
         else {
             prompted = YES;
             
-            [self.locationManager requestWhenInUseAuthorization];
+            if([self.locationManager respondsToSelector:@selector(requestWhenInUseAuthorization)])
+                [self.locationManager requestWhenInUseAuthorization];
+            else
+                [self.locationManager startUpdatingLocation];
         }
+    }
+    else if(status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
+        if(nil != _didFailBlock) {
+            _didFailBlock(manager, nil);
+        }
+        
+        [[[UIAlertView alloc] initWithTitle:@"Location Request"
+                                    message:@"Unable to access your location. Please check your devices settings."
+                                   delegate:nil
+                          cancelButtonTitle:@"OK"
+                          otherButtonTitles:nil] show];
+    }
+    else {
+        [self.locationManager startUpdatingLocation];
     }
 }
 
